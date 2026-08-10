@@ -1,29 +1,35 @@
-import React, { useState } from 'react';
-import { 
-  HeartPulse, Activity, ArrowRight, ArrowLeft, RotateCcw, 
-  CheckCircle2, AlertCircle, Scale, Ruler, Stethoscope, Users,
-  Info, ActivitySquare
-} from 'lucide-react';
+// ============================================================================
+// การนำไปใช้งาน: คุณสามารถแยกส่วนต่างๆ ด้านล่างนี้ไปเป็นไฟล์ตามโครงสร้างเดิมได้
+// ============================================================================
 
-// --- Utility Functions ---
+import React, { useState, useEffect, useRef } from 'react';
+
+// ============================================================================
+// 📁 src/utils/bmiCalculator.js
+// ============================================================================
 const calculateBMI = (weight, height) => {
   if (!weight || !height) return 0;
-  const hInMeters = height / 100;
-  return (weight / (hInMeters * hInMeters)).toFixed(2);
+  const heightInMeters = height / 100;
+  const bmi = weight / (heightInMeters * heightInMeters);
+  return Number(bmi.toFixed(2));
 };
 
 const getBMITranslation = (bmi) => {
+  if (bmi === 0) return '-';
   if (bmi < 18.5) return 'น้ำหนักน้อย / ผอม';
-  if (bmi < 23) return 'ปกติ (สุขภาพดี)';
-  if (bmi < 25) return 'ท้วม / โรคอ้วนระดับ 1';
-  if (bmi < 30) return 'อ้วน / โรคอ้วนระดับ 2';
+  if (bmi <= 22.9) return 'ปกติ (สุขภาพดี)';
+  if (bmi <= 24.9) return 'ท้วม / โรคอ้วนระดับ 1';
+  if (bmi <= 29.9) return 'อ้วน / โรคอ้วนระดับ 2';
   return 'อ้วนมาก / โรคอ้วนระดับ 3';
 };
 
+// ============================================================================
+// 📁 src/utils/riskCalculator.js
+// ============================================================================
 const getBMIScore = (bmi) => {
-  if (bmi < 23) return 0;
-  if (bmi < 27.5) return 3;
-  return 5;
+  if (bmi === 0 || bmi < 23) return 0;
+  if (bmi <= 27.4) return 3; // 23.0 - 27.4
+  return 5; // >= 27.5
 };
 
 const calculateRiskScore = (data) => {
@@ -35,9 +41,9 @@ const calculateRiskScore = (data) => {
   else if (age >= 50) score += 2;
   
   // 2. เพศ
-  if (data.gender === 'male') score += 2;
+  if (data.gender === 'male') score += 2; // หญิง = 0
   
-  // 3. BMI
+  // 3. BMI 
   const bmi = calculateBMI(data.weight, data.height);
   score += getBMIScore(bmi);
   
@@ -56,36 +62,30 @@ const calculateRiskScore = (data) => {
 };
 
 const getRiskLevel = (score) => {
-  if (score <= 2) return { level: 'น้อย', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: 'bg-emerald-500' };
-  if (score <= 5) return { level: 'ปานกลาง', color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', bar: 'bg-amber-500' };
-  if (score <= 8) return { level: 'สูง', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-200', bar: 'bg-orange-500' };
-  return { level: 'สูงมาก', color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', bar: 'bg-rose-500' };
+  if (score <= 2) return { level: 'ต่ำ', color: 'text-green-700', bg: 'bg-green-50', border: 'border-green-600' };
+  if (score <= 5) return { level: 'ปานกลาง', color: 'text-yellow-700', bg: 'bg-yellow-50', border: 'border-yellow-500' };
+  if (score <= 8) return { level: 'สูง', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-500' };
+  return { level: 'สูงมาก', color: 'text-red-700', bg: 'bg-red-50', border: 'border-red-600' };
 };
 
-const RECOMMENDATIONS = [
-  { range: '0–2', level: 'น้อย', text: 'ออกกำลังกายสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิต ควรประเมินความเสี่ยงซ้ำทุก 3 ปี' },
-  { range: '3–5', level: 'ปานกลาง', text: 'ออกกำลังกายสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิต ควรประเมินความเสี่ยงซ้ำทุก 3 ปี' },
-  { range: '6–8', level: 'สูง', text: 'ควบคุมอาหารและออกกำลังกายสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิต ตรวจระดับน้ำตาลในเลือด ควรประเมินความเสี่ยงซ้ำทุก 1–3 ปี' },
-  { range: '9–17', level: 'สูงมาก', text: 'ควบคุมอาหารและออกกำลังกายสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิต ตรวจระดับน้ำตาลในเลือด ควรประเมินความเสี่ยงซ้ำทุก 1 ปี' },
-];
+// ============================================================================
+// 📁 src/data/recommendations.js
+// ============================================================================
+const RECOMMENDATIONS = {
+  'ต่ำ': 'ควรออกกำลังกายอย่างสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิตเป็นประจำ และควรประเมินความเสี่ยงซ้ำทุก 3 ปี',
+  'ปานกลาง': 'ควรออกกำลังกายอย่างสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ที่เหมาะสม ตรวจวัดความดันโลหิตเป็นประจำ และควรประเมินความเสี่ยงซ้ำทุก 1-3 ปี',
+  'สูง': 'ควรควบคุมอาหารและออกกำลังกายอย่างสม่ำเสมอ ควบคุมน้ำหนักตัวให้อยู่ในเกณฑ์ ตรวจวัดความดันโลหิต ตรวจระดับน้ำตาลในเลือด และควรประเมินความเสี่ยงซ้ำทุก 1 ปี',
+  'สูงมาก': 'มีความเสี่ยงสูงมาก ควรปรึกษาแพทย์เพื่อตรวจระดับน้ำตาลในเลือด ควบคุมอาหารและออกกำลังกายอย่างเคร่งครัด และควรประเมินความเสี่ยงซ้ำทุก 1 ปี หรือตามแพทย์นัด'
+};
 
-const getBadgeColor = (level) => {
-  switch (level) {
-    case 'น้อย': return 'bg-emerald-100 text-emerald-700 border border-emerald-200';
-    case 'ปานกลาง': return 'bg-amber-100 text-amber-700 border border-amber-200';
-    case 'สูง': return 'bg-orange-100 text-orange-700 border border-orange-200';
-    case 'สูงมาก': return 'bg-rose-100 text-rose-700 border border-rose-200';
-    default: return 'bg-slate-100 text-slate-700 border border-slate-200';
-  }
-}
 
+// ============================================================================
+// 📁 src/App.jsx (ส่วนประกอบหลัก)
+// ============================================================================
 export default function App() {
-  const [step, setStep] = useState(0); 
-  const [error, setError] = useState('');
-  
   const [formData, setFormData] = useState({
-    gender: '',
     age: '',
+    gender: '',
     weight: '',
     height: '',
     waist: '',
@@ -93,316 +93,376 @@ export default function App() {
     familyHistory: ''
   });
 
-  const resetForm = () => {
-    setFormData({
-      gender: '', age: '', weight: '', height: '', waist: '', hypertension: '', familyHistory: ''
-    });
-    setStep(0);
-    setError('');
-  };
+  const [errors, setErrors] = useState({});
+  const [isCalculated, setIsCalculated] = useState(false);
+  const resultRef = useRef(null);
 
-  const handleNext = () => {
-    if (step === 1 && !formData.gender) return setError('กรุณาระบุเพศของคุณ');
-    if (step === 2 && (!formData.age || Number(formData.age) <= 0)) return setError('กรุณากรอกอายุให้ถูกต้อง (มากกว่า 0)');
-    if (step === 3 && (!formData.weight || !formData.height || Number(formData.weight) <= 0 || Number(formData.height) <= 0)) {
-      return setError('กรุณากรอกน้ำหนักและส่วนสูงให้ถูกต้อง (มากกว่า 0)');
-    }
-    if (step === 4 && (!formData.waist || Number(formData.waist) <= 0)) return setError('กรุณากรอกรอบเอวให้ถูกต้อง (มากกว่า 0)');
-    if (step === 5 && !formData.hypertension) return setError('กรุณาระบุประวัติความดันโลหิต');
-    if (step === 6 && !formData.familyHistory) return setError('กรุณาระบุประวัติครอบครัว');
-    
-    setError('');
-    setStep(prev => prev + 1);
-  };
+  const currentBMI = calculateBMI(formData.weight, formData.height);
 
-  const handleBack = () => {
-    setError('');
-    setStep(prev => prev - 1);
-  };
-
-  const updateData = (field, value) => {
+  const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    setError('');
+    // Clear error for this field when user starts typing
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+    // Re-hide results if form changes after calculation
+    if (isCalculated) {
+      setIsCalculated(false);
+    }
   };
 
-  const renderHeader = () => (
-    <header className="bg-white border-b border-teal-100 sticky top-0 z-10 shadow-sm">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-center max-w-3xl">
-        <div className="flex items-center gap-2 text-teal-700">
-          <ActivitySquare className="w-6 h-6" />
-          <h1 className="font-bold text-lg tracking-tight">Diabetes Risk Assessment</h1>
-        </div>
-      </div>
-    </header>
-  );
-
-  const renderHome = () => (
-    <div className="animate-in fade-in zoom-in-95 duration-500 flex flex-col items-center text-center pt-8 pb-12">
-      <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mb-6 shadow-inner text-teal-600">
-        <HeartPulse className="w-10 h-10" />
-      </div>
-      <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-4">แบบประเมินความเสี่ยงโรคเบาหวาน</h2>
-      <p className="text-slate-600 mb-8 max-w-md leading-relaxed">
-        ประเมินความเสี่ยงต่อการเกิดโรคเบาหวานเบื้องต้นในอีก 12 ปีข้างหน้า ด้วยข้อมูลสุขภาพของคุณอ้างอิงตามเกณฑ์ของศูนย์เบาหวานศิริราช
-      </p>
-      
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8 max-w-md w-full flex items-start gap-3 text-left shadow-sm">
-        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-sm text-amber-800 leading-relaxed">
-          <strong>ข้อควรระวัง:</strong> แบบประเมินนี้ใช้เพื่อประเมินความเสี่ยงเบื้องต้นเท่านั้น <span className="underline decoration-amber-300 underline-offset-4">ไม่สามารถใช้แทนการวินิจฉัยจากแพทย์ได้</span>
-        </p>
-      </div>
-
-      <button 
-        onClick={() => setStep(1)}
-        className="w-full sm:w-auto px-8 py-4 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-full shadow-lg shadow-teal-600/30 transition-all active:scale-95 flex items-center justify-center gap-2 text-lg"
-      >
-        เริ่มทำแบบประเมิน <ArrowRight className="w-5 h-5" />
-      </button>
-    </div>
-  );
-
-  const renderAssessment = () => {
-    const currentBMI = calculateBMI(formData.weight, formData.height);
+  const validateForm = () => {
+    const newErrors = {};
+    if (!formData.age || isNaN(formData.age) || Number(formData.age) <= 0) newErrors.age = 'กรุณาระบุอายุ';
+    if (!formData.gender) newErrors.gender = 'กรุณาระบุเพศ';
+    if (!formData.weight || isNaN(formData.weight) || Number(formData.weight) <= 0) newErrors.weight = 'กรุณาระบุน้ำหนัก';
+    if (!formData.height || isNaN(formData.height) || Number(formData.height) <= 0) newErrors.height = 'กรุณาระบุส่วนสูง';
+    if (!formData.waist || isNaN(formData.waist) || Number(formData.waist) <= 0) newErrors.waist = 'กรุณาระบุรอบเอว';
+    if (!formData.hypertension) newErrors.hypertension = 'กรุณาระบุข้อมูล';
+    if (!formData.familyHistory) newErrors.familyHistory = 'กรุณาระบุข้อมูล';
     
-    return (
-      <div className="max-w-xl mx-auto py-6 animate-in slide-in-from-bottom-4 duration-300">
-        <div className="mb-8">
-          <div className="flex justify-between text-sm text-slate-500 mb-2 font-medium">
-            <span>ขั้นตอนที่ {step}</span>
-            <span>จาก 6</span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-            <div 
-              className="bg-teal-500 h-2.5 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${(step / 6) * 100}%` }}
-            ></div>
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleCalculate = () => {
+    if (validateForm()) {
+      setIsCalculated(true);
+      setTimeout(() => {
+        resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      setIsCalculated(false);
+      // alert or just let the red text show
+    }
+  };
+
+  const handleReset = () => {
+    setFormData({
+      age: '', gender: '', weight: '', height: '', waist: '', hypertension: '', familyHistory: ''
+    });
+    setErrors({});
+    setIsCalculated(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f4f7f9] font-sans text-slate-800 pb-16">
+      
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 shadow-sm py-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-center">
+          <h1 className="text-xl md:text-2xl font-bold text-[#0f6497]">แบบประเมินความเสี่ยงโรคเบาหวาน (Diabetes Risk Assessment)</h1>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        
+        {/* Intro */}
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 mb-8">
+          <p className="text-slate-600 leading-relaxed text-sm md:text-base">
+            <strong>คำชี้แจง:</strong> กรุณากรอกข้อมูลและเลือกคำตอบที่ตรงกับความเป็นจริงมากที่สุด เพื่อให้ระบบคำนวณระดับความเสี่ยงในการเกิดโรคเบาหวานของคุณ 
+            (แบบประเมินนี้อ้างอิงจากศูนย์เบาหวานศิริราช สำหรับใช้ประเมินเบื้องต้นเท่านั้น ไม่สามารถแทนการวินิจฉัยโดยแพทย์)
+          </p>
+        </div>
+
+        {/* Assessment Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-300 overflow-hidden mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-[#1e40af] text-white">
+                  <th className="p-4 w-2/5 border-r border-[#1e3a8a] font-semibold text-sm md:text-base">รายการประเมิน / คำถาม</th>
+                  <th className="p-4 w-3/5 font-semibold text-sm md:text-base">ข้อมูล / ตัวเลือก</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                
+                {/* Q1: Age */}
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">1. อายุ (ปีบริบูรณ์)</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="1" max="120"
+                        value={formData.age}
+                        onChange={(e) => handleInputChange('age', e.target.value)}
+                        className={`w-32 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.age ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
+                        placeholder="เช่น 45"
+                      />
+                      <span className="text-slate-500">ปี</span>
+                    </div>
+                    {errors.age && <p className="text-red-500 text-sm mt-1">{errors.age}</p>}
+                  </td>
+                </tr>
+
+                {/* Q2: Gender */}
+                <tr className="hover:bg-slate-50 transition-colors bg-slate-50/50">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">2. เพศกำเนิด</td>
+                  <td className="p-4">
+                    <div className="flex flex-wrap gap-4">
+                      <label className={`flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer transition-all ${formData.gender === 'male' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="gender" value="male" checked={formData.gender === 'male'} onChange={() => handleInputChange('gender', 'male')} className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>ชาย</span>
+                      </label>
+                      <label className={`flex items-center gap-2 px-4 py-2 border rounded-md cursor-pointer transition-all ${formData.gender === 'female' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="gender" value="female" checked={formData.gender === 'female'} onChange={() => handleInputChange('gender', 'female')} className="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>หญิง</span>
+                      </label>
+                    </div>
+                    {errors.gender && <p className="text-red-500 text-sm mt-1">{errors.gender}</p>}
+                  </td>
+                </tr>
+
+                {/* Q3: Weight */}
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">3. น้ำหนัก</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="1"
+                        value={formData.weight}
+                        onChange={(e) => handleInputChange('weight', e.target.value)}
+                        className={`w-32 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.weight ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
+                        placeholder="เช่น 65"
+                      />
+                      <span className="text-slate-500">กิโลกรัม</span>
+                    </div>
+                    {errors.weight && <p className="text-red-500 text-sm mt-1">{errors.weight}</p>}
+                  </td>
+                </tr>
+
+                {/* Q4: Height */}
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">4. ส่วนสูง</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="1"
+                        value={formData.height}
+                        onChange={(e) => handleInputChange('height', e.target.value)}
+                        className={`w-32 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.height ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
+                        placeholder="เช่น 165"
+                      />
+                      <span className="text-slate-500">เซนติเมตร</span>
+                    </div>
+                    {errors.height && <p className="text-red-500 text-sm mt-1">{errors.height}</p>}
+                  </td>
+                </tr>
+
+                {/* Calculated BMI Display Row */}
+                <tr className="bg-[#f8fafc]">
+                  <td className="p-4 align-middle border-r border-slate-200 text-slate-600">
+                    <span className="inline-flex items-center gap-2">
+                      ดัชนีมวลกาย (BMI) 
+                      <span className="text-xs px-2 py-0.5 bg-slate-200 rounded text-slate-600">คำนวณอัตโนมัติ</span>
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    {currentBMI > 0 ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                        <span className="text-xl font-bold text-[#0f6497]">{currentBMI} <span className="text-sm font-normal text-slate-500">kg/m²</span></span>
+                        <span className="px-3 py-1 bg-white border border-slate-300 rounded-md text-sm font-medium text-slate-700">
+                          {getBMITranslation(currentBMI)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400 text-sm italic">กรุณากรอกน้ำหนักและส่วนสูง</span>
+                    )}
+                  </td>
+                </tr>
+
+                {/* Q5: Waist */}
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">5. รอบเอว</td>
+                  <td className="p-4">
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" min="1"
+                        value={formData.waist}
+                        onChange={(e) => handleInputChange('waist', e.target.value)}
+                        className={`w-32 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.waist ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
+                        placeholder="เช่น 85"
+                      />
+                      <span className="text-slate-500">เซนติเมตร (วัดระดับสะดือ)</span>
+                    </div>
+                    {errors.waist && <p className="text-red-500 text-sm mt-1">{errors.waist}</p>}
+                  </td>
+                </tr>
+
+                {/* Q6: Hypertension */}
+                <tr className="hover:bg-slate-50 transition-colors bg-slate-50/50">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">
+                    6. ท่านมีภาวะความดันโลหิตสูงหรือไม่<br/>
+                    <span className="text-sm font-normal text-slate-500">(รวมถึงผู้ที่กำลังรับประทานยาลดความดันโลหิต)</span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <label className={`flex items-center gap-3 px-4 py-3 border rounded-md cursor-pointer transition-all ${formData.hypertension === 'no' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="hypertension" value="no" checked={formData.hypertension === 'no'} onChange={() => handleInputChange('hypertension', 'no')} className="w-5 h-5 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>ไม่เป็น (หรือ ไม่ทราบ)</span>
+                      </label>
+                      <label className={`flex items-center gap-3 px-4 py-3 border rounded-md cursor-pointer transition-all ${formData.hypertension === 'yes' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="hypertension" value="yes" checked={formData.hypertension === 'yes'} onChange={() => handleInputChange('hypertension', 'yes')} className="w-5 h-5 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>เป็น (มีภาวะความดันโลหิตสูง)</span>
+                      </label>
+                    </div>
+                    {errors.hypertension && <p className="text-red-500 text-sm mt-1">{errors.hypertension}</p>}
+                  </td>
+                </tr>
+
+                {/* Q7: Family History */}
+                <tr className="hover:bg-slate-50 transition-colors">
+                  <td className="p-4 align-top border-r border-slate-200 font-medium">
+                    7. ท่านมีประวัติโรคเบาหวานในญาติสายตรงหรือไม่<br/>
+                    <span className="text-sm font-normal text-slate-500">(พ่อ แม่ พี่ หรือ น้อง ร่วมสายเลือด)</span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <label className={`flex items-center gap-3 px-4 py-3 border rounded-md cursor-pointer transition-all ${formData.familyHistory === 'no' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="familyHistory" value="no" checked={formData.familyHistory === 'no'} onChange={() => handleInputChange('familyHistory', 'no')} className="w-5 h-5 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>ไม่มีประวัติ</span>
+                      </label>
+                      <label className={`flex items-center gap-3 px-4 py-3 border rounded-md cursor-pointer transition-all ${formData.familyHistory === 'yes' ? 'bg-blue-50 border-blue-500 text-blue-800' : 'bg-white border-slate-300 hover:bg-slate-100'}`}>
+                        <input type="radio" name="familyHistory" value="yes" checked={formData.familyHistory === 'yes'} onChange={() => handleInputChange('familyHistory', 'yes')} className="w-5 h-5 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        <span>มีประวัติญาติสายตรงเป็นโรคเบาหวาน</span>
+                      </label>
+                    </div>
+                    {errors.familyHistory && <p className="text-red-500 text-sm mt-1">{errors.familyHistory}</p>}
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-rose-50 text-rose-700 rounded-xl border border-rose-200 flex items-center gap-3 text-sm font-medium animate-in fade-in slide-in-from-top-2">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            {error}
+        {/* Action Button & Validation Alert */}
+        <div className="flex flex-col items-center mb-12">
+          {Object.keys(errors).length > 0 && (
+            <div className="w-full bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-center font-medium">
+              กรุณาตอบแบบประเมินให้ครบถ้วนในข้อที่ไฮไลต์สีแดง
+            </div>
+          )}
+          
+          <button 
+            onClick={handleCalculate}
+            className="px-10 py-3 bg-[#1e40af] hover:bg-[#1e3a8a] text-white text-lg font-semibold rounded-md shadow-md transition-all active:scale-95"
+          >
+            คำนวณผลการประเมิน
+          </button>
+        </div>
+
+        {/* Result Section */}
+        {isCalculated && (
+          <div ref={resultRef} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-white border border-slate-300 rounded-lg shadow-md overflow-hidden mb-8">
+              
+              <div className="bg-slate-50 border-b border-slate-200 p-4 text-center">
+                <h2 className="text-xl font-bold text-slate-800">สรุปผลการประเมินความเสี่ยงโรคเบาหวาน</h2>
+              </div>
+              
+              <div className="p-6 md:p-8">
+                {(() => {
+                  const score = calculateRiskScore(formData);
+                  const riskData = getRiskLevel(score);
+                  return (
+                    <>
+                      {/* Score and Risk Box */}
+                      <div className={`flex flex-col md:flex-row items-center justify-center gap-6 p-6 rounded-lg border-2 mb-8 ${riskData.border} ${riskData.bg}`}>
+                        <div className="text-center md:border-r-2 md:border-black/10 md:pr-8">
+                          <span className="block text-slate-600 font-medium mb-1">คะแนนรวมของท่าน</span>
+                          <span className={`text-6xl font-black ${riskData.color}`}>{score}</span>
+                          <span className="text-slate-500 ml-2">คะแนน</span>
+                        </div>
+                        <div className="text-center md:pl-4">
+                          <span className="block text-slate-600 font-medium mb-1">ระดับความเสี่ยง</span>
+                          <span className={`text-3xl font-bold ${riskData.color}`}>{riskData.level}</span>
+                        </div>
+                      </div>
+
+                      <hr className="my-8 border-slate-200" />
+
+                      {/* Info Summary & Recommendations */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        
+                        {/* Left Col: Info */}
+                        <div>
+                          <h3 className="font-bold text-lg text-[#0f6497] mb-4 border-l-4 border-[#0f6497] pl-3">การแปลผลความเสี่ยง</h3>
+                          <table className="w-full text-sm border-collapse border border-slate-200 mb-6">
+                            <thead className="bg-slate-100 text-slate-700">
+                              <tr>
+                                <th className="border border-slate-200 p-2 text-center w-1/2">คะแนนที่ได้</th>
+                                <th className="border border-slate-200 p-2 text-center w-1/2">ระดับความเสี่ยง</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-center">
+                              <tr className={score <= 2 ? "bg-green-100 font-bold" : ""}>
+                                <td className="border border-slate-200 p-2">น้อยกว่า หรือ เท่ากับ 2</td>
+                                <td className="border border-slate-200 p-2 text-green-700">ต่ำ</td>
+                              </tr>
+                              <tr className={(score >= 3 && score <= 5) ? "bg-yellow-100 font-bold" : ""}>
+                                <td className="border border-slate-200 p-2">3 - 5</td>
+                                <td className="border border-slate-200 p-2 text-yellow-700">ปานกลาง</td>
+                              </tr>
+                              <tr className={(score >= 6 && score <= 8) ? "bg-orange-100 font-bold" : ""}>
+                                <td className="border border-slate-200 p-2">6 - 8</td>
+                                <td className="border border-slate-200 p-2 text-orange-700">สูง</td>
+                              </tr>
+                              <tr className={score >= 9 ? "bg-red-100 font-bold" : ""}>
+                                <td className="border border-slate-200 p-2">9 คะแนนขึ้นไป</td>
+                                <td className="border border-slate-200 p-2 text-red-700">สูงมาก</td>
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <div className="bg-slate-50 p-4 rounded-md border border-slate-200">
+                            <div className="mb-2">
+                              <span className="text-slate-600 font-medium">ค่า BMI ของท่าน: </span>
+                              <span className="font-bold">{currentBMI} kg/m²</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-600 font-medium">การแปลค่า BMI: </span>
+                              <span className="font-bold text-[#0f6497]">{getBMITranslation(currentBMI)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right Col: Recommendation */}
+                        <div>
+                          <h3 className="font-bold text-lg text-[#0f6497] mb-4 border-l-4 border-[#0f6497] pl-3">คำแนะนำสำหรับระดับความเสี่ยง "{riskData.level}"</h3>
+                          <div className="p-5 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 leading-relaxed text-sm md:text-base">
+                            {RECOMMENDATIONS[riskData.level]}
+                          </div>
+                          
+                          <div className="mt-8 text-center md:text-right">
+                            <button 
+                              onClick={handleReset}
+                              className="px-6 py-2 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 rounded-md font-medium transition-colors"
+                            >
+                              ทำแบบประเมินใหม่อีกครั้ง
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
           </div>
         )}
+      </main>
 
-        <div className="bg-white rounded-3xl shadow-xl shadow-teal-900/5 border border-slate-100 p-6 md:p-8 mb-6">
-          
-          {step === 1 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <Users className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800">เพศของคุณ</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => updateData('gender', 'male')} className={`p-4 rounded-2xl border-2 text-lg font-medium transition-all ${formData.gender === 'male' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  ชาย
-                </button>
-                <button onClick={() => updateData('gender', 'female')} className={`p-4 rounded-2xl border-2 text-lg font-medium transition-all ${formData.gender === 'female' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  หญิง
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <Activity className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800">อายุของคุณ (ปี)</h3>
-              </div>
-              <div>
-                <input 
-                  type="number" min="1"
-                  value={formData.age} 
-                  onChange={(e) => updateData('age', e.target.value)}
-                  placeholder="เช่น 45"
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-xl outline-none text-slate-800 placeholder:text-slate-300"
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <Scale className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800">น้ำหนักและส่วนสูง</h3>
-              </div>
-              <p className="text-slate-500 text-sm">ระบบจะคำนวณดัชนีมวลกาย (BMI) อัตโนมัติ</p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-2">น้ำหนัก (กิโลกรัม)</label>
-                  <input 
-                    type="number" min="1"
-                    value={formData.weight} 
-                    onChange={(e) => updateData('weight', e.target.value)}
-                    placeholder="เช่น 60"
-                    className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-lg outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-2">ส่วนสูง (เซนติเมตร)</label>
-                  <input 
-                    type="number" min="1"
-                    value={formData.height} 
-                    onChange={(e) => updateData('height', e.target.value)}
-                    placeholder="เช่น 165"
-                    className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-lg outline-none"
-                  />
-                </div>
-              </div>
-
-              {currentBMI > 0 && (
-                <div className="mt-6 p-5 rounded-2xl border border-teal-100 bg-teal-50/50 animate-in zoom-in-95 duration-300">
-                  <div className="flex justify-between items-center mb-5 pb-4 border-b border-teal-100/50">
-                    <span className="font-semibold text-teal-900">ดัชนีมวลกาย (BMI)</span>
-                    <span className="text-3xl font-bold text-teal-600">{currentBMI} <span className="text-sm font-normal text-teal-600/70">kg/m²</span></span>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="p-3.5 bg-white rounded-xl border border-teal-100/50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-2">
-                      <div className="text-sm text-slate-500 font-medium">การแปลผล BMI</div>
-                      <div className="font-semibold text-slate-700 text-right">{getBMITranslation(currentBMI)}</div>
-                    </div>
-                    <div className="p-3.5 bg-white rounded-xl border border-teal-100/50 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-2">
-                      <div className="text-sm text-slate-500 font-medium">คะแนน BMI</div>
-                      <div className="font-bold text-teal-600 text-right px-3 py-1 bg-teal-50 rounded-lg">{getBMIScore(currentBMI)} คะแนน</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <Ruler className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800">รอบเอวของคุณ (เซนติเมตร)</h3>
-              </div>
-              <div>
-                <input 
-                  type="number" min="1"
-                  value={formData.waist} 
-                  onChange={(e) => updateData('waist', e.target.value)}
-                  placeholder="เช่น 85"
-                  className="w-full px-5 py-4 rounded-2xl border-2 border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-xl outline-none text-slate-800"
-                />
-              </div>
-            </div>
-          )}
-
-          {step === 5 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <HeartPulse className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800">คุณมีภาวะความดันโลหิตสูงหรือไม่?</h3>
-              </div>
-              <p className="text-slate-500 text-sm">รวมถึงผู้ที่กำลังรับประทานยาลดความดันโลหิตอยู่</p>
-              <div className="grid grid-cols-1 gap-4">
-                <button onClick={() => updateData('hypertension', 'yes')} className={`p-4 rounded-2xl border-2 text-left text-lg font-medium transition-all ${formData.hypertension === 'yes' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  เป็น / มีภาวะความดันโลหิตสูง
-                </button>
-                <button onClick={() => updateData('hypertension', 'no')} className={`p-4 rounded-2xl border-2 text-left text-lg font-medium transition-all ${formData.hypertension === 'no' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  ไม่เป็น
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 6 && (
-            <div className="space-y-6 animate-in fade-in">
-              <div className="flex items-center gap-3 text-teal-700 mb-2">
-                <Stethoscope className="w-6 h-6" />
-                <h3 className="text-xl font-bold text-slate-800 leading-snug">คุณมีประวัติโรคเบาหวานในญาติสายตรงหรือไม่?</h3>
-              </div>
-              <p className="text-slate-500 text-sm">ญาติสายตรง ได้แก่ พ่อ แม่ พี่ หรือ น้อง ร่วมสายเลือด</p>
-              <div className="grid grid-cols-1 gap-4 mt-4">
-                <button onClick={() => updateData('familyHistory', 'yes')} className={`p-4 rounded-2xl border-2 text-left text-lg font-medium transition-all ${formData.familyHistory === 'yes' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  มีประวัติ
-                </button>
-                <button onClick={() => updateData('familyHistory', 'no')} className={`p-4 rounded-2xl border-2 text-left text-lg font-medium transition-all ${formData.familyHistory === 'no' ? 'border-teal-500 bg-teal-50 text-teal-800' : 'border-slate-200 hover:border-teal-200 text-slate-600'}`}>
-                  ไม่มีประวัติ
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-4">
-          <button 
-            onClick={handleBack}
-            className="w-1/3 px-6 py-4 rounded-2xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors shadow-sm flex justify-center items-center gap-2"
-          >
-            <ArrowLeft className="w-5 h-5" /> กลับ
-          </button>
-          <button 
-            onClick={handleNext}
-            className="w-2/3 px-6 py-4 rounded-2xl font-semibold text-white bg-teal-600 hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/30 flex justify-center items-center gap-2"
-          >
-            {step === 6 ? 'ดูผลประเมิน' : 'ถัดไป'} {step !== 6 && <ArrowRight className="w-5 h-5" />}
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const renderResult = () => {
-    const score = calculateRiskScore(formData);
-    const riskData = getRiskLevel(score);
-    const currentBMI = calculateBMI(formData.weight, formData.height);
-
-    return (
-      <div className="max-w-3xl mx-auto py-6 animate-in slide-in-from-bottom-8 duration-500">
-        
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-teal-100 text-teal-600 rounded-full mb-4">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-          <h2 className="text-3xl font-bold text-slate-800">ผลการประเมินความเสี่ยงโรคเบาหวาน</h2>
-        </div>
-
-        <div className={`p-8 rounded-3xl text-center border-2 shadow-xl mb-8 relative overflow-hidden ${riskData.border} ${riskData.bg}`}>
-          <div className={`absolute top-0 right-0 w-32 h-32 rounded-full -mr-10 -mt-10 opacity-20 ${riskData.bar}`}></div>
-          
-          <div className="text-slate-600 font-semibold mb-3 relative z-10">คะแนนความเสี่ยงรวมของคุณ</div>
-          <div className={`text-7xl font-black mb-6 relative z-10 tracking-tight ${riskData.color}`}>
-            {score} <span className="text-2xl text-slate-500 font-medium tracking-normal">คะแนน</span>
-          </div>
-          <div className={`inline-block px-6 py-2.5 rounded-full bg-white font-bold text-lg shadow-sm border border-white/50 relative z-10 ${riskData.color}`}>
-            ระดับความเสี่ยง: {riskData.level}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-lg shadow-slate-200/40 mb-8">
-          <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-            <Info className="w-5 h-5 text-teal-600"/> สรุปข้อมูลสุขภาพของคุณ
-          </h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm mb-6">
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div className="text-slate-500 mb-1">เพศ / อายุ</div>
-              <div className="font-semibold text-slate-700">{formData.gender === 'male' ? 'ชาย' : 'หญิง'} / {formData.age} ปี</div>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div className="text-slate-500 mb-1">รอบเอว</div>
-              <div className="font-semibold text-slate-700">{formData.waist} ซม.</div>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-              <div className="text-slate-500 mb-1">ความดันโลหิตสูง</div>
-              <div className="font-semibold text-slate-700">{formData.hypertension === 'yes' ? 'เป็น' : 'ไม่เป็น'}</div>
-            </div>
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 md:col-span-3">
-              <div className="text-slate-500 mb-1">ประวัติเบาหวานในญาติสายตรง</div>
-              <div className="font-semibold text-slate-700">{formData.familyHistory === 'yes' ? 'มีประวัติ' : 'ไม่มีประวัติ'}</div>
-            </div>
-          </div>
-
-          <div className="bg-teal-50 rounded-2xl p-4 border border-teal-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-             <div>
-               <div className="text-teal-900 font-bold mb-1">ค่า BMI ของคุณ: {currentBMI} kg/m²</div>
-               <div className="text-sm text-teal-700">แปลผล: <span className="font-semibold">{getBMITranslation(currentBMI)}</span></div>
-             </div>
-             <div className="px-4
+      {/* Footer */}
+      <footer className="text-center py-6 text-slate-500 text-sm border-t border-slate-200 bg-white mt-auto">
+        อ้างอิงแบบประเมิน: ศูนย์เบาหวานศิริราช คณะแพทยศาสตร์ศิริราชพยาบาล มหาวิทยาลัยมหิดล
+      </footer>
+    </div>
+  );
+}
